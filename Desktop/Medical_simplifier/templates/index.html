@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Terminology Simplifier</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Logo Section -->
+        <div class="logo-container">
+            <img id="x" src="{{ url_for('static', path='IVIS_logo.png') }}" alt="IVIS Labs Logo">
+            <img id = "y"src="{{ url_for('static', path='NIE_University.png') }}" alt="NIE University Logo">
+            
+        </div>
+
+        <!-- Header Section -->
+        <header>
+            <h1>Medical Terminology Simplifier</h1>
+            <p>Simplify Complex Medical Terms Into Patient-Friendly Language.</p>
+        </header>
+
+        <!-- Form Section -->
+        <div class="form-container">
+            <form id="simplifyForm">
+                <div class="form-group">
+                    <label for="medical_term">Enter Medical Term:</label>
+                    <input type="text" id="medical_term" name="medical_term" placeholder="e.g., Hypertension" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="condition_category">Select Medical Condition Category:</label>
+                    <select id="condition_category" name="condition_category">
+                        <option value="cardiology">Cardiology</option>
+                        <option value="neurology">Neurology</option>
+                        <option value="orthopedics">Orthopedics</option>
+                        <option value="pediatrics">Pediatrics</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tone">Select Tone:</label>
+                    <select id="tone" name="tone">
+                        <option value="patient-friendly">Patient-Friendly</option>
+                        <option value="professional">Professional</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="audience">Target Audience:</label>
+                    <select id="audience" name="audience">
+                        <option value="adult_patients">Adult Patients</option>
+                        <option value="children">Children</option>
+                        <option value="elderly">Elderly</option>
+                        <option value="medical_students">Medical Students</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="output_format">Preferred Output Format:</label>
+                    <select id="output_format" name="output_format">
+                        <option value="short_definition">Short Definition</option>
+                        <option value="detailed_explanation">Detailed Explanation</option>
+                        <option value="bullet_points">Bullet Points</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="model">Select Model:</label>
+                    <select id="model" name="model">
+                        <option value="gemma2:2b" selected>gemma2:2b</option>
+                    </select>
+                </div>
+
+                <button type="submit" id="simplifyBtn">Simplify</button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-container" id="resultsContainer" style="display: none;">
+            <h2>Simplified Term</h2>
+            <div id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Simplifying term...</p>
+            </div>
+            <div id="results"></div>
+            <button id="copyBtn">Copy to Clipboard</button>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/models');
+                const data = await response.json();
+                const modelSelect = document.getElementById('model');
+                modelSelect.innerHTML = '';
+    
+                data.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error fetching models:', error);
+            }
+        });
+    
+        document.getElementById('simplifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+    
+            const formData = new FormData(e.target);
+            const resultsContainer = document.getElementById('resultsContainer');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+    
+            resultsContainer.style.display = 'block';
+            loading.style.display = 'block';
+            results.innerHTML = '';
+    
+            try {
+                const response = await fetch('/simplify', {
+                    method: 'POST',
+                    body: formData
+                });
+    
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.statusText}`);
+                }
+    
+                const data = await response.json();
+                results.innerHTML = `<div class="result-box"><p id="resultText">${data.simplified_term}</p></div>`;
+    
+            } catch (error) {
+                results.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    
+        // ✅ COPY FUNCTION (Improved)
+        document.getElementById('copyBtn').addEventListener('click', async () => {
+            const textElement = document.getElementById('resultText');
+    
+            if (!textElement) {
+                alert("No text available to copy!");
+                return;
+            }
+    
+            const textToCopy = textElement.innerText.trim();
+    
+            if (textToCopy === "") {
+                alert("No text to copy!");
+                return;
+            }
+    
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    // ✅ Using Clipboard API
+                    await navigator.clipboard.writeText(textToCopy);
+                    showCopySuccess();
+                } else {
+                    // ❌ Clipboard API unsupported, fallback method
+                    fallbackCopyText(textToCopy);
+                }
+            } catch (err) {
+                console.error('Copy failed:', err);
+                alert("Copy failed. Please copy manually.");
+            }
+        });
+    
+        // ✅ Fallback Copy Method
+        function fallbackCopyText(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showCopySuccess();
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+                alert("Copy failed. Please select the text manually.");
+            }
+            document.body.removeChild(textArea);
+        }
+    
+        // ✅ Success Message
+        function showCopySuccess() {
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = 'Copy to Clipboard';
+            }, 2000);
+        }
+    </script>
+    
+    
+    
+    
+   
+</body>
+</html>
